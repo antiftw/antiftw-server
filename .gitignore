@@ -1,0 +1,18 @@
+# Mailserver downloadable configuration files
+mailserver/docker-compose.yml
+mailserver/mailserver.env
+
+# Webdav configuration and data files
+baikal/.env
+baikal/data/*
+baikal/config/*
+!baikal/data/.htaccess
+!baikal/config/.htaccess
+
+# Autosave Caddy configuration files
+caddy/Caddyfile.autosave
+caddy/autosave.json
+
+# Caddy configuration and data files
+caddy/config/
+caddy/data/

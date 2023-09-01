@@ -1,0 +1,286 @@
+#!/bin/bash
+
+# Get the arguments
+for arg in "$@"; do
+    case "$arg" in
+    -h | --help)
+        echo ""
+        echo "This script can to download the configuration/setup files for the docker-mailserver."
+        echo ""
+        echo "Note that this will install the server in the current directory,"
+        echo "so make sure you are in the correct directory before running this script."
+        echo ""
+        echo "Usage: $0 <hostname> [options]"
+        echo ""
+        echo "Example usage (with everything enabled):"
+        echo ""
+        echo "  $0 mail.antiftw.nl -e=admin@antiftw.nl -f2b -rh=mail.kpnmail.nl -rport=587 -rpass=123456 -ru=antolin@kpnmail.nl -s=le-caddy -sa -v"
+        echo ""
+        echo "Allowed options:"
+        echo ""
+        echo "  -e, --email=<address>      The email address to use for the SSL certificate"
+        echo "                              - Example: admin@antiftw.nl (default)"
+        echo ""
+        echo "  -f, --force                Force overwrite of existing configuration files"
+        echo ""
+        echo "  -f2b, --fail2ban           Enable fail2ban for the mailserver (default is disabled)"
+        echo ""
+        echo "  -h, --help                 Show this help message"
+        echo ""
+        echo "  -rh, --relay-hostname      The hostname of the relay server"
+        echo "                              - Example: mail.kpnmail.nl"
+        echo ""
+        echo "  -rpass, --relay-password   The password of the relay server"
+        echo ""
+        echo "  -rport, --relay-port       The port of the relay server (either 25, 465 or 587)"
+        echo ""
+        echo "  -ru, --relay-username      The username of the relay server"
+        echo ""
+        echo "  -s, --ssl=<type>           Use SSL/TLS for the mailserver"
+        echo "                              - Valid values: le, le-caddy, self-signed"
+        echo ""
+        echo "  -sa, --spam-assassin       Enable SpamAssassin for the mailserver (default is disabled)"
+        echo ""
+        echo "  <hostname>                 The FQDN hostname of the mailserver"
+        echo "                              - Example: mail.example.com"
+        echo ""
+        echo "  -v, --verbose              Verbose output"
+        exit 0
+        ;;
+    -e=* | --email=*)
+        EMAIL="${arg#*=}"
+        ;;
+    -f | --force)
+        FORCE=true
+        ;;
+    -f2b | --fail2ban)
+        FAIL2BAN=true
+        ;;
+    -rh=* | --relay-hostname=*)
+        RELAY_HOSTNAME="${arg#*=}"
+        ;;
+    -rpass=* | --relay-password=*)
+        RELAY_PASSWORD="${arg#*=}"
+        ;;
+    -rport=* | --relay-port=*)
+        RELAY_PORT="${arg#*=}"
+        ;;
+    -ru=* | --relay-username=*)
+        RELAY_USERNAME="${arg#*=}"
+        ;;
+    -s=* | --ssl=*)
+        SSL="${arg#*=}"
+        ;;
+    -sa | --spamassassin)
+        SPAMASSASSIN=true
+        ;;
+    -v | --verbose)
+        VERBOSE=true
+        ;;
+    *)
+        MAILSERVER_HOSTNAME="$arg"
+        ;;
+    esac
+done
+
+# Check if a hostname was specified
+if [ -z "$MAILSERVER_HOSTNAME" ]; then
+    echo -e "\nNo hostname was specified. Please specify a hostname as the first argument.\n"
+    echo -e "Example: $0 mail.example.com\n"
+    echo -e "Aborting...\n"
+    exit 1
+fi
+
+DOCKER_COMPOSE_FILE="docker-compose.yml"
+MAILSERVER_ENV_FILE="mailserver.env"
+
+# Check if the SSL value was set, else set it to false
+if [ -z "$SSL" ]; then
+    SSL=false
+fi
+
+EMAIL=${EMAIL:-"admin@antiftw.nl"}
+FAIL2BAN=${FAIL2BAN:-false}
+SPAMASSASSIN=${SPAMASSASSIN:-false}
+VERBOSE=${VERBOSE:-false}
+
+if [ "$VERBOSE" ]; then
+    # Print arguments
+    echo "Arguments:"
+    echo "  MAILSERVER_HOSTNAME: $MAILSERVER_HOSTNAME"
+    echo "  EMAIL: $EMAIL"
+    echo "  FORCE: $FORCE"
+    echo "  FAIL2BAN: $FAIL2BAN"
+    echo "  RELAY_HOSTNAME: $RELAY_HOSTNAME"
+    echo "  RELAY_PASSWORD: $RELAY_PASSWORD"
+    echo "  RELAY_PORT: $RELAY_PORT"
+    echo "  RELAY_USERNAME: $RELAY_USERNAME"
+    echo "  SSL: $SSL"
+    echo "  SPAMASSASSIN: $SPAMASSASSIN"
+    echo ""
+
+fi
+
+# Check if we already have downloaded the initial config
+if [ ! -f "$DOCKER_COMPOSE_FILE" ] || [ ! -f "$MAILSERVER_ENV_FILE" ] || [ $FORCE ]; then
+
+    # Remove existing files if they exist
+    [ -f $DOCKER_COMPOSE_FILE ] && rm -f $DOCKER_COMPOSE_FILE
+    [ -f $MAILSERVER_ENV_FILE ] && rm -f $MAILSERVER_ENV_FILE
+
+    # Get the configuration files for the installation
+    DMS_GITHUB_URL="https://raw.githubusercontent.com/antiftw/docker-mailserver/master"
+    wget "${DMS_GITHUB_URL}/$DOCKER_COMPOSE_FILE"
+    wget "${DMS_GITHUB_URL}/$MAILSERVER_ENV_FILE"
+
+    # Replace the mailserver hostname with the specified hostname inside docker.compose.yml
+    sed -i "s/mail.example.com/${MAILSERVER_HOSTNAME}/g" "$DOCKER_COMPOSE_FILE"
+
+    #########################
+    ## SET RELAY VARIABLES ##
+    #########################
+
+    if [ "$RELAY_HOSTNAME" ] || [ "$RELAY_USERNAME" ] || [ "$RELAY_PASSWORD" ] || [ "$RELAY_PORT" ]; then
+        if [ -z "$RELAY_HOSTNAME" ] || [ -z "$RELAY_USERNAME" ] || [ -z "$RELAY_PASSWORD" ] || [ -z "$RELAY_PORT" ]; then
+            echo -e "\nYou have specified a relay hostname, username, password or port, but not all of them."
+            echo -e "Please specify all of them, or none of them.\n"
+            echo -e "Aborting...\n"
+            exit 1
+        fi
+        [ "$VERBOSE" ] && echo "Setting Relayhost variables..."
+        # Set the relay variables in the .env file
+        sed -i "s|RELAY_HOST=|RELAY_HOST=$RELAY_HOSTNAME|g" "$MAILSERVER_ENV_FILE"
+        sed -i "s|RELAY_PORT=25|RELAY_PORT=$RELAY_PORT|g" "$MAILSERVER_ENV_FILE"
+        sed -i "s|RELAY_USER=|RELAY_USER=$RELAY_USERNAME|g" "$MAILSERVER_ENV_FILE"
+        sed -i "s|RELAY_PASSWORD=|RELAY_PASSWORD=$RELAY_PASSWORD|g" "$MAILSERVER_ENV_FILE"
+
+    fi
+
+    #######################
+    ## SET SSL VARIABLES ##
+    #######################
+
+    if [ $SSL != false ]; then
+        
+        # Enable SSL/TLS in .env file
+        [ "$VERBOSE" ] && echo "Enabling SSL..."
+        sed -i "s/SSL_TYPE=/SSL_TYPE=$SSL/g" "$MAILSERVER_ENV_FILE"
+        
+        # Insert emailaddress into .env file
+        [ "$VERBOSE" ] && echo "Inserting Emailaddress..."
+        sed -i "s/SSL_CERT_EMAIL/SSL_CERT_EMAIL=$EMAIL/g" "$MAILSERVER_ENV_FILE"
+
+        if [ "$SSL" == 'le' ]; then
+            
+            # Manual LetsEncrypt (create and renew certificates manually)
+            
+            echo ""
+            echo "You have chosen to use letsencrypt for SSL/TLS."
+            echo "Please make sure that you ahave a valid certificate in /etc/letsencrypt/live/$MAILSERVER_HOSTNAME before continuing."
+            echo "If you don't have a valid certificate, check out the following link for instructions on how to get one:"
+            echo ""
+            echo "https://docker-mailserver.github.io/docker-mailserver/latest/config/security/ssl/#lets-encrypt-recommended"
+            echo ""
+            read -p "Press 'y' if a certificate is present, or another key if you want to generate one: " -n 1 -r
+            echo ""
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                # Requires access to port 80 from the internet, adjust your firewall if needed.
+                docker run --rm -it \
+                    -v "${PWD}/docker-data/certbot/certs/:/etc/letsencrypt/" \
+                    -v "${PWD}/docker-data/certbot/logs/:/var/log/letsencrypt/" \
+                    -p 80:80 \
+                    certbot/certbot certonly --standalone -d mail.example.com
+                # We need to mount the local letsencrypt folder
+                sed -i "s|#SSL_MOUNT|- /etc/letsencrypt:/etc/letsencrypt|g" "$DOCKER_COMPOSE_FILE"
+            else
+                printf "\n"
+                # We need to mount the global letsencrypt folder
+                sed -i "s|#SSL_MOUNT|- ./docker-data/certbot/certs/:/etc/letsencrypt|g" "$DOCKER_COMPOSE_FILE"
+            fi
+
+        
+        elif [ "$SSL" == 'le-caddy' ]; then
+            
+            # LetsEncrypt with Caddy (create and renew certificates automatically)
+            echo ""
+            echo "You have chosen to use Caddy (letsencrypt/ZeroSSL) for SSL/TLS."
+            echo "This will configure the Caddy Docker Proxy server in such a way so that it will automatically get and renew certificates for you."
+            echo ""
+            
+            # Certificate directory changes depending on whether we are local or not
+            if [[ $$MAILSERVER_HOSTNAME == *"localhost"* ]]; then
+                SSL_SUBDIRECTORY="local"
+            else
+                SSL_SUBDIRECTORY="acme-v02.api.letsencrypt.org-directory"
+            fi
+            
+            # Mount directory with certificates
+            [ "$VERBOSE" ] && echo "Mounting directory with certificates..."
+            
+            # Weird string is because we need to escape the spaces. (https://stackoverflow.com/a/18439749/3569294)           
+            LINE_1="\ \ \ \ \ \ \- ../caddy/data/caddy/certificates/$SSL_SUBDIRECTORY/$MAILSERVER_HOSTNAME/$MAILSERVER_HOSTNAME.crt:/etc/letsencrypt/live/mail.example.com/fullchain.pem"
+            LINE_2="\ \ \ \ \ \ \- ../caddy/data/caddy/certificates/$SSL_SUBDIRECTORY/$MAILSERVER_HOSTNAME/$MAILSERVER_HOSTNAME.key:/etc/letsencrypt/live/mail.example.com/privkey.pem"
+
+            # /a means append, so we append the lines to the file, after the match.
+            # Easiest way to insert multiple lines with sed (https://stackoverflow.com/a/15559399/3569294)
+            sed -i "/SSL_MOUNT/a $LINE_2" "$DOCKER_COMPOSE_FILE"
+            sed -i "/SSL_MOUNT/a $LINE_1" "$DOCKER_COMPOSE_FILE"
+
+            # Setup labels so Caddy can automatically get certificates
+            [ "$VERBOSE" ] && echo "Setting up labels for Caddy..."
+            sed -i "s|# labels:|labels:|g" "$DOCKER_COMPOSE_FILE"
+            sed -i "s|#   caddy: $MAILSERVER_HOSTNAME|  caddy: $MAILSERVER_HOSTNAME|g" "$DOCKER_COMPOSE_FILE"
+            sed -i "s|#   caddy.reverse_proxy: "{{upstreams 80}}"|  caddy.reverse_proxy: "{{upstreams 80}}"|g" "$DOCKER_COMPOSE_FILE"
+            
+            # Add service to the caddy network
+            [ "$VERBOSE" ] && echo "Adding service to the caddy network..."
+            sed -i "s|# networks:|networks:|g" "$DOCKER_COMPOSE_FILE"
+            sed -i "s|#   - caddy|  - caddy|g" "$DOCKER_COMPOSE_FILE"
+
+            # Create the network for Caddy
+            [ "$VERBOSE" ] && echo "Creating network for Caddy..."
+            docker network create caddy
+
+        elif [ "$SSL" == 'self-signed' ]; then
+
+            # Self-signed certificate (not recommended for production use)
+            echo "You have chosen to use a self-signed certificate for SSL/TLS."
+            echo "This is not recommended for production use, but can be used for testing purposes."
+            echo "For more information on how to configure this, check out the following link:"
+            echo ""
+            echo "https://docker-mailserver.github.io/docker-mailserver/latest/config/security/ssl/#self-signed-certificates"
+            echo ""
+        fi
+    fi
+
+    if [ "$FAIL2BAN" ]; then
+        # Enable Fail2Ban in .env file
+        [ "$VERBOSE" ] && echo "Enabling Fail2Ban..."
+        sed -i "s|ENABLE_FAIL2BAN=0|ENABLE_FAIL2BAN=1|g" "$MAILSERVER_ENV_FILE"
+
+        # Set the fail2ban variables in docker-compose.yml
+        sed -i "s|# cap_add:|cap_add:|g" "$DOCKER_COMPOSE_FILE"
+        sed -i "s|#   - NET_ADMIN|  - NET_ADMIN|g" "$DOCKER_COMPOSE_FILE"
+        
+    fi
+
+    if [ "$SPAMASSASSIN" ]; then
+        # Enable SpamAssassin in .env file
+        [ "$VERBOSE" ] && echo "Enabling SpamAssassin..."
+        sed -i "s|ENABLE_SPAMASSASSIN=0|ENABLE_SPAMASSASSIN=1|g" "$MAILSERVER_ENV_FILE"
+    fi
+
+    printf "\n"
+    echo "The configuration files have been downloaded, and $MAILSERVER_HOSTNAME has been set as the hostname."
+    echo "If you want to use a different hostname, you can modify the hostname in the '$DOCKER_COMPOSE_FILE' file"
+    echo "You can modify any desired settings in the '$MAILSERVER_ENV_FILE' file, and then run 'docker-compose up -d' to start the mailserver."
+    printf "\n"
+
+else
+    printf "\n"
+    echo "It looks like you already downloaded the configuration files for the mailserver."
+    echo "If you want to overwrite the configuration files, please run this command with the '-f' or '--force' flag."
+    echo ""
+    echo "Example: $0 mail.example.com -f"
+    echo ""
+fi

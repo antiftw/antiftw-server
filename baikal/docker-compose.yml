@@ -1,0 +1,20 @@
+services:
+  # Baikal webserver for caldav/carddav
+  baikal:
+    image: ckulka/baikal:nginx
+    container_name: baikal.webdav
+    restart: always
+    networks:
+      - caddy
+    labels:
+      caddy: ${BAIKAL_HOSTNAME:-dav.antiftw.nl}
+      caddy.reverse_proxy: "{{upstreams 80}}"
+    volumes:
+      - ./config:/var/www/baikal/config
+      - ./data:/var/www/baikal/Specific
+networks:
+  caddy:
+    external: true
+volumes:
+  baikal.data:
+  baikal.config:
