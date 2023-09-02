@@ -162,10 +162,6 @@ if [ ! -f "$DOCKER_COMPOSE_FILE" ] || [ ! -f "$MAILSERVER_ENV_FILE" ] || [ $FORC
 
     if [ $SSL != false ]; then
         
-        # Enable SSL/TLS in .env file
-        [ "$VERBOSE" ] && echo "Enabling SSL..."
-        sed -i "s/SSL_TYPE=/SSL_TYPE=$SSL/g" "$MAILSERVER_ENV_FILE"
-        
         # Insert emailaddress into .env file
         [ "$VERBOSE" ] && echo "Inserting Emailaddress..."
         sed -i "s/SSL_CERT_EMAIL/SSL_CERT_EMAIL=$EMAIL/g" "$MAILSERVER_ENV_FILE"
@@ -173,7 +169,11 @@ if [ ! -f "$DOCKER_COMPOSE_FILE" ] || [ ! -f "$MAILSERVER_ENV_FILE" ] || [ $FORC
         if [ "$SSL" == 'le' ]; then
             
             # Manual LetsEncrypt (create and renew certificates manually)
-            
+
+            # Enable SSL/TLS in .env file
+            [ "$VERBOSE" ] && echo "Enabling SSL..."
+            sed -i "s/^SSL_TYPE=/SSL_TYPE=letsencrypt/g" "$MAILSERVER_ENV_FILE"
+
             echo ""
             echo "You have chosen to use letsencrypt for SSL/TLS."
             echo "Please make sure that you ahave a valid certificate in /etc/letsencrypt/live/$MAILSERVER_HOSTNAME before continuing."
@@ -206,6 +206,10 @@ if [ ! -f "$DOCKER_COMPOSE_FILE" ] || [ ! -f "$MAILSERVER_ENV_FILE" ] || [ $FORC
             echo "You have chosen to use Caddy (letsencrypt/ZeroSSL) for SSL/TLS."
             echo "This will configure the Caddy Docker Proxy server in such a way so that it will automatically get and renew certificates for you."
             echo ""
+
+            # Enable SSL/TLS in .env file explicitly. This is because le-caddy is not a valid value for SSL_TYPE, and uses also letsenrypt
+            [ "$VERBOSE" ] && echo "Enabling SSL..."
+            sed -i "s/^SSL_TYPE=/SSL_TYPE=letsencrypt/g" "$MAILSERVER_ENV_FILE"
             
             # Certificate directory changes depending on whether we are local or not
             if [[ $$MAILSERVER_HOSTNAME == *"localhost"* ]]; then
