@@ -41,6 +41,12 @@ docker compose -f mailserver/docker-compose.yml up -d
 
 The mailserver requires some additional configuration, which can be found through its [own repository](https://github.com/antiftw/docker-mailserver).
 
+In short it comes down to the following steps:
+
+- Create at least one emailaddress using 
+
+   ```docker exec -ti <CONTAINER NAME> setup email add admin@example.com```
+
 ## Useful tips
 
 ### Code completion Caddy JSON Schema in VSCODE

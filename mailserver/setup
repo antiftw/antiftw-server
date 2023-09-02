@@ -238,13 +238,14 @@ if [ ! -f "$DOCKER_COMPOSE_FILE" ] || [ ! -f "$MAILSERVER_ENV_FILE" ] || [ $FORC
             
             # Add service to the caddy network
             [ "$VERBOSE" ] && echo "Adding service to the caddy network..."
-            sed -i "s|# networks:|networks:|g" "$DOCKER_COMPOSE_FILE"
-            sed -i "s|#   - caddy|  - caddy|g" "$DOCKER_COMPOSE_FILE"
-
-            # Create the network for Caddy
-            [ "$VERBOSE" ] && echo "Creating network for Caddy..."
-            docker network create caddy
-
+            sed -i "s|# networks:|networks:|" "$DOCKER_COMPOSE_FILE"
+            sed -i "s|#   - caddy|  - caddy|" "$DOCKER_COMPOSE_FILE"
+            
+            # Define network for Caddy
+            sed -i "s|# networks:|networks:|" "$DOCKER_COMPOSE_FILE"
+            sed -i "s|#   caddy:|  caddy:|" "$DOCKER_COMPOSE_FILE"
+            sed -i "s|#     external: true|    external: true|" "$DOCKER_COMPOSE_FILE" 
+            
         elif [ "$SSL" == 'self-signed' ]; then
 
             # Self-signed certificate (not recommended for production use)
@@ -265,7 +266,7 @@ if [ ! -f "$DOCKER_COMPOSE_FILE" ] || [ ! -f "$MAILSERVER_ENV_FILE" ] || [ $FORC
         # Set the fail2ban variables in docker-compose.yml
         sed -i "s|# cap_add:|cap_add:|g" "$DOCKER_COMPOSE_FILE"
         sed -i "s|#   - NET_ADMIN|  - NET_ADMIN|g" "$DOCKER_COMPOSE_FILE"
-        
+
     fi
 
     if [ "$SPAMASSASSIN" ]; then
