@@ -222,9 +222,16 @@ if [ ! -f "$DOCKER_COMPOSE_FILE" ] || [ ! -f "$MAILSERVER_ENV_FILE" ] || [ $FORC
             [ "$VERBOSE" ] && echo "Mounting directory with certificates..."
             
             # Weird string is because we need to escape the spaces. (https://stackoverflow.com/a/18439749/3569294)           
-            LINE_1="\ \ \ \ \ \ \- ../caddy/data/caddy/certificates/$SSL_SUBDIRECTORY/$MAILSERVER_HOSTNAME/$MAILSERVER_HOSTNAME.crt:/etc/letsencrypt/live/mail.example.com/fullchain.pem"
-            LINE_2="\ \ \ \ \ \ \- ../caddy/data/caddy/certificates/$SSL_SUBDIRECTORY/$MAILSERVER_HOSTNAME/$MAILSERVER_HOSTNAME.key:/etc/letsencrypt/live/mail.example.com/privkey.pem"
+            
+            ## NOTE:
+            ## These lines are commented out, because these files do not exist on the initial boot
+            ## They will be created by Caddy when it recognizes the labels in the docker-compose.yml file
+            ## After that we can shut down the mailserver, and uncomment these lines, and then start the mailserver again.
+            ## (Added note of this in the README.md file)
 
+            LINE_1="#\ \ \ \ \ \ \- ../caddy/data/caddy/certificates/$SSL_SUBDIRECTORY/$MAILSERVER_HOSTNAME/$MAILSERVER_HOSTNAME.crt:/etc/letsencrypt/live/$MAILSERVER_HOSTNAME/fullchain.pem"
+            LINE_2="#\ \ \ \ \ \ \- ../caddy/data/caddy/certificates/$SSL_SUBDIRECTORY/$MAILSERVER_HOSTNAME/$MAILSERVER_HOSTNAME.key:/etc/letsencrypt/live/$MAILSERVER_HOSTNAME/privkey.pem"
+            
             # /a means append, so we append the lines to the file, after the match.
             # Easiest way to insert multiple lines with sed (https://stackoverflow.com/a/15559399/3569294)
             sed -i "/SSL_MOUNT/a $LINE_2" "$DOCKER_COMPOSE_FILE"
@@ -246,7 +253,11 @@ if [ ! -f "$DOCKER_COMPOSE_FILE" ] || [ ! -f "$MAILSERVER_ENV_FILE" ] || [ $FORC
             sed -i "s|#   caddy:|  caddy:|" "$DOCKER_COMPOSE_FILE"
             sed -i "s|#     external: true|    external: true|" "$DOCKER_COMPOSE_FILE" 
             
-        elif [ "$SSL" == 'self-signed' ]; then
+        elif [ "$SSL" == 'ss' ]; then
+
+            # Enable SSL/TLS in .env file explicitly. This is because le-caddy is not a valid value for SSL_TYPE, and uses also letsenrypt
+            [ "$VERBOSE" ] && echo "Enabling SSL..."
+            sed -i "s/^SSL_TYPE=/SSL_TYPE=self-signed/g" "$MAILSERVER_ENV_FILE"
 
             # Self-signed certificate (not recommended for production use)
             echo "You have chosen to use a self-signed certificate for SSL/TLS."
