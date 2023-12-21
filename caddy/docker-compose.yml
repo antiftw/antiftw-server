@@ -12,12 +12,9 @@ services:
       - caddy
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - caddy_data:/data
-      - caddy_config:/config
+      - ./data:/data
+      - ./config:/config
     restart: unless-stopped
 networks:
   caddy:
     external: true
-volumes:
-  caddy_data:
-  caddy_config:

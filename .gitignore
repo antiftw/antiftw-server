@@ -16,3 +16,7 @@ caddy/autosave.json
 # Caddy configuration and data files
 caddy/config/
 caddy/data/
+
+# .idea files
+.idea/
+
