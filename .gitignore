@@ -2,6 +2,9 @@
 mailserver/docker-compose.yml
 mailserver/mailserver.env
 
+# Mailserver data files
+mailserver/docker-data/*
+
 # Webdav configuration and data files
 baikal/.env
 baikal/data/*
