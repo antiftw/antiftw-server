@@ -241,7 +241,7 @@ if [ ! -f "$DOCKER_COMPOSE_FILE" ] || [ ! -f "$MAILSERVER_ENV_FILE" ] || [ $FORC
             [ "$VERBOSE" ] && echo "Setting up labels for Caddy..."
             sed -i "s|# labels:|labels:|g" "$DOCKER_COMPOSE_FILE"
             sed -i "s|#   caddy: $MAILSERVER_HOSTNAME|  caddy: $MAILSERVER_HOSTNAME|g" "$DOCKER_COMPOSE_FILE"
-            sed -i "s|#   caddy.reverse_proxy: "{{upstreams 80}}"|  caddy.reverse_proxy: "{{upstreams 80}}"|g" "$DOCKER_COMPOSE_FILE"
+            sed -i "s|#   caddy.respond: "Unauthorized 403"|  caddy.respond: "Unauthorized 403"|g" "$DOCKER_COMPOSE_FILE"
             
             # Add service to the caddy network
             [ "$VERBOSE" ] && echo "Adding service to the caddy network..."
