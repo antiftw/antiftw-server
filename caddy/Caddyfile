@@ -1,0 +1,16 @@
+# Custom Caddyfile for external proxies
+# This file is merged with the auto-generated config from caddy-docker-proxy
+#
+# Pi5 acts as the main gateway, forwarding specific domains to Pi4 for testing
+
+# Proxy mercure.dst-connect.io to Pi4 (192.168.50.97)
+# Pi5 terminates TLS, forwards HTTP to Pi4
+mercure.dst-connect.io {
+    reverse_proxy 192.168.50.97:80
+}
+
+# Add additional external proxies below as needed
+# Example:
+# another-domain.dst-connect.io {
+#     reverse_proxy 192.168.50.97:80
+# }
