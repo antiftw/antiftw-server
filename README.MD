@@ -47,33 +47,6 @@ docker compose -f baikal/docker-compose.yml up -d
 docker compose -f mailserver/docker-compose.yml up -d
 ```
 
-### External Proxy (Hybrid Setup)
-
-The Caddy Docker Proxy can be extended with a custom Caddyfile to proxy external domains to other servers. This is useful when running multiple Pis on a home network with a single public IP.
-
-**Architecture:**
-```
-Internet -> Router -> Pi5 (main gateway) -> Pi4 (testing server)
-                           |
-                           +-> Local Docker services (mail, dav, web, api)
-```
-
-The `caddy/Caddyfile` is mounted into the container and merged with the auto-generated config from caddy-docker-proxy. Edit this file to add external proxy rules:
-
-```caddyfile
-# Proxy to another server on the local network
-mercure.dst-connect.io {
-    reverse_proxy 192.168.50.97:443 {
-        transport http {
-            tls
-            tls_insecure_skip_verify
-        }
-    }
-}
-```
-
-**Note:** The target server (Pi4) manages its own TLS certificates. Pi5 terminates TLS for the incoming request and re-encrypts to Pi4. The `tls_insecure_skip_verify` is needed because Pi4's certificate is issued for the domain, not the internal IP.
-
 ### TLS
 
 When running the `./setup` command, using the `-tls=` option we can indicate that you want to activate TLS (**strongly** recommended for a production environment), and select the method you would like to use. 

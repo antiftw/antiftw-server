@@ -14,7 +14,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./data:/data
       - ./config:/config
-      - ./Caddyfile:/etc/caddy/Caddyfile  # Custom config for external proxies
     restart: unless-stopped
 networks:
   caddy:
