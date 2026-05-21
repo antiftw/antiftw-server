@@ -67,11 +67,15 @@ This will configure CaddyServer (in this case the Caddy Docker Proxy server) in 
 
 ⚠️ **Important** ⚠️ 
 
-Due to some idiosyncrasy with Docker - where it will create new directories when mounting a non-existant file - in combination with the way CaddyServer generates the certificates, the script configures `docker-compose.yml` in such a way so that it **DOES NOT** mount the certificate files. 
+Due to some idiosyncrasy with Docker - where it will create new directories when mounting a non-existant path - in combination with the way CaddyServer generates the certificates, the script configures `docker-compose.yml` in such a way so that it **DOES NOT** mount the certificate directory.
 
-So: we boot DMS the first time without these mounts, so that CaddyServer recognizes the domain and generates the certificate. After this, we need to shutdown DMS, and uncomment the lines beneath `# SSL_MOUNT` so that the certificate- and keyfile are mounted inside the container.
+So: we boot DMS the first time without the mount, so that CaddyServer recognizes the domain and generates the certificate. After this, we need to shutdown DMS, uncomment the line beneath `# SSL_MOUNT` so that the certificate directory is mounted inside the container, and start DMS again.
 
 ⚠️ **Important** ⚠️ 
+
+We mount Caddy's certificate **directory** (not the individual files) and tell DMS where to find them via `SSL_TYPE=manual` + `SSL_CERT_PATH` + `SSL_KEY_PATH` in `mailserver.env`. Directory mounts survive Caddy's atomic file replacement on renewal; single-file mounts do not — they pin the original inode and silently serve the stale cert until the container restarts.
+
+DMS still holds the cert in memory after Caddy renews, so a container restart is required to pick up the new cert. The `mailserver/cert-sync` script (run via cron on the host) detects when the on-disk cert no longer matches the one DMS is serving and restarts the container. Install it once per host.
 
 #### Self-signed
 

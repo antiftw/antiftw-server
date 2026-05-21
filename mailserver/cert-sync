@@ -1,0 +1,29 @@
+#!/bin/bash
+# Safety net for Caddy-managed TLS certs inside the docker-mailserver container.
+#
+# Caddy renews the cert silently on disk, but postfix/dovecot keep the old one
+# in memory until the container restarts. This script compares the cert dovecot
+# is actually serving on :993 against the cert file on disk; if they differ,
+# it restarts the container.
+#
+# Install (as root):
+#   ln -s "$(pwd)/cert-sync" /usr/local/bin/mailserver-cert-sync
+#   echo '17 4 * * * root /usr/local/bin/mailserver-cert-sync 2>&1 | logger -t mailserver-cert-sync' \
+#     > /etc/cron.d/mailserver-cert-sync
+#   chmod 644 /etc/cron.d/mailserver-cert-sync
+set -euo pipefail
+
+CONTAINER=mailserver
+HOST=mail.antiftw.nl
+CERT_FILE=/etc/dms/certs/${HOST}/${HOST}.crt
+
+docker inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null | grep -q true || exit 0
+
+disk=$(docker exec "$CONTAINER" openssl x509 -in "$CERT_FILE" -noout -enddate | cut -d= -f2)
+live=$(echo | openssl s_client -connect 127.0.0.1:993 -servername "$HOST" 2>/dev/null \
+       | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2 || true)
+
+if [ -n "$live" ] && [ "$disk" != "$live" ]; then
+  echo "$(date -Is) cert drift: disk=$disk live=$live — restarting $CONTAINER"
+  docker restart "$CONTAINER"
+fi

@@ -207,35 +207,37 @@ if [ ! -f "$DOCKER_COMPOSE_FILE" ] || [ ! -f "$MAILSERVER_ENV_FILE" ] || [ $FORC
             echo "This will configure the Caddy Docker Proxy server in such a way so that it will automatically get and renew certificates for you."
             echo ""
 
-            # Enable SSL/TLS in .env file explicitly. This is because le-caddy is not a valid value for SSL_TYPE, and uses also letsenrypt
+            # Enable SSL/TLS in .env file. We use SSL_TYPE=manual + SSL_CERT_PATH/SSL_KEY_PATH so
+            # we can bind-mount the Caddy cert *directory* (not individual files) into the container.
+            # Directory mounts survive Caddy's atomic file replacement on renewal, where single-file
+            # mounts pin the original inode and silently serve the stale cert until container restart.
             [ "$VERBOSE" ] && echo "Enabling SSL..."
-            sed -i "s/^SSL_TYPE=/SSL_TYPE=letsencrypt/g" "$MAILSERVER_ENV_FILE"
-            
+            sed -i "s/^SSL_TYPE=/SSL_TYPE=manual/g" "$MAILSERVER_ENV_FILE"
+            sed -i "s|^SSL_CERT_PATH=|SSL_CERT_PATH=/etc/dms/certs/${MAILSERVER_HOSTNAME}/${MAILSERVER_HOSTNAME}.crt|g" "$MAILSERVER_ENV_FILE"
+            sed -i "s|^SSL_KEY_PATH=|SSL_KEY_PATH=/etc/dms/certs/${MAILSERVER_HOSTNAME}/${MAILSERVER_HOSTNAME}.key|g" "$MAILSERVER_ENV_FILE"
+
             # Certificate directory changes depending on whether we are local or not
             if [[ $$MAILSERVER_HOSTNAME == *"localhost"* ]]; then
                 SSL_SUBDIRECTORY="local"
             else
                 SSL_SUBDIRECTORY="acme-v02.api.letsencrypt.org-directory"
             fi
-            
+
             # Mount directory with certificates
             [ "$VERBOSE" ] && echo "Mounting directory with certificates..."
-            
-            # Weird string is because we need to escape the spaces. (https://stackoverflow.com/a/18439749/3569294)           
-            
+
+            # Weird string is because we need to escape the spaces. (https://stackoverflow.com/a/18439749/3569294)
+
             ## NOTE:
-            ## These lines are commented out, because these files do not exist on the initial boot
-            ## They will be created by Caddy when it recognizes the labels in the docker-compose.yml file
-            ## After that we can shut down the mailserver, and uncomment these lines, and then start the mailserver again.
+            ## This line is commented out, because the directory does not exist on the initial boot.
+            ## Caddy will create it when it recognizes the labels in the docker-compose.yml file.
+            ## After that we can shut down the mailserver, uncomment this line, and start it again.
             ## (Added note of this in the README.md file)
 
-            LINE_1="#\ \ \ \ \ \ \- ../caddy/data/caddy/certificates/$SSL_SUBDIRECTORY/$MAILSERVER_HOSTNAME/$MAILSERVER_HOSTNAME.crt:/etc/letsencrypt/live/$MAILSERVER_HOSTNAME/fullchain.pem"
-            LINE_2="#\ \ \ \ \ \ \- ../caddy/data/caddy/certificates/$SSL_SUBDIRECTORY/$MAILSERVER_HOSTNAME/$MAILSERVER_HOSTNAME.key:/etc/letsencrypt/live/$MAILSERVER_HOSTNAME/privkey.pem"
-            
-            # /a means append, so we append the lines to the file, after the match.
-            # Easiest way to insert multiple lines with sed (https://stackoverflow.com/a/15559399/3569294)
-            sed -i "/SSL_MOUNT/a $LINE_2" "$DOCKER_COMPOSE_FILE"
-            sed -i "/SSL_MOUNT/a $LINE_1" "$DOCKER_COMPOSE_FILE"
+            LINE="#\ \ \ \ \ \ \- ../caddy/data/caddy/certificates/$SSL_SUBDIRECTORY/$MAILSERVER_HOSTNAME/:/etc/dms/certs/$MAILSERVER_HOSTNAME/:ro"
+
+            # /a means append, so we append the line to the file, after the match.
+            sed -i "/SSL_MOUNT/a $LINE" "$DOCKER_COMPOSE_FILE"
 
             # Setup labels so Caddy can automatically get certificates
             [ "$VERBOSE" ] && echo "Setting up labels for Caddy..."
